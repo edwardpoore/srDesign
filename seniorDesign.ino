@@ -1,5 +1,5 @@
 
-/* 
+/*
 Xstream Team Sr. Design
 Written by Edward Poore
 Spring 2012
@@ -24,18 +24,18 @@ byte inByte; //call/reponse variable
 
 void setup()
 {
-  Serial.begin(4800); //start serial comm
+  Serial.begin(9600); //start serial comm
   pinMode(10, OUTPUT); //pin 10 needs to be set as an output for the SD library
   pinMode(2, OUTPUT); //used to drive the temperature sensor
-  
-  
+
+
   //Look for a SD card
   if (!SD.begin(8)) 
   {
     Serial.println("No SD card detected!");
     return;
   }
-    
+
   //Get the current date/time from the clock module
   //Set the time library to automatically sync the time clock from the DS1307
   //DS1307 SDA is Ain4, SCL is Ain5
@@ -43,19 +43,19 @@ void setup()
   if(timeStatus()!= timeSet) 
     Serial.println("Unable to sync with the RTC");
   else
-    Serial.println("RTC has set the system time"); 
- 
+    Serial.println("RTC has set the system time");
+
   //Generate initial file if none found
   if(!SD.exists("mydata.csv"))
   {
     eraseFile();
   }
-  
+
   index = 1; //index to represent how many measurements have been made since last time power was lost. Set to 1 at startup
-  
-  
+
+
   Serial.println("Setup Complete.");
-}  
+}
 
 void loop()
 {
