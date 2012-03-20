@@ -19,16 +19,23 @@ SD card information:
 #include <DS1307RTC.h> //basic DS1307 library
 
 int index;
-//AlarmId measure; //measurement object
-byte inByte; //call/reponse variable
+const int triple1 = 7; //triple sensor number 1
+const int triple2 = 8; //triple sensor number 2
 
 void setup()
 {
   Serial.begin(9600); //start serial comm
   pinMode(10, OUTPUT); //pin 10 needs to be set as an output for the SD library
   pinMode(2, OUTPUT); //used to drive the temperature sensor
-
-
+  
+  //SETUP FOR TRIPLE SENSOR ONE WIRE DATA LINES
+  //Sensor 1
+  digitalWrite(triple1, LOW); //initialize it to low
+  pinMode(triple1, INPUT);      // sets the digital pin as input (logic 1)
+  //Sensor 2
+  digitalWrite(triple2, LOW); //initialize it to low
+  pinMode(triple2, INPUT);      // sets the digital pin as input (logic 1)
+  
   //Look for a SD card
   if (!SD.begin(8)) 
   {
@@ -59,6 +66,7 @@ void setup()
 
 void loop()
 {
+  byte inByte; //call/reponse variable
   //Call/Response for serial  
 
     if (Serial.available() > 0)
@@ -97,7 +105,8 @@ void takeMeas(void)
   /* 
   
     OTHER MEASUREMENT FUNCTION CALLS
-    
+    LIKE, FOR EXAMPLE, THE ONE FOR THE TRIPLE SENSORS
+    THAT YOU NEED TO CLEAN UP
   */
   
   //Build a string to represent the current time/date
@@ -119,7 +128,8 @@ If it doesn't, just generate the new file.
 */
   
 void eraseFile()
-{
+{ 
+  byte inByte; //call/reponse variable
   int eraseStuff = 0; //variable to kick out of the loop if erase is desired
   Serial.println("Are you sure? y or n?");
   while(!eraseStuff) //if erase stuff gets set to 1 (y is detected)
@@ -266,3 +276,227 @@ float read_temp(void){                          //the read temperature function
 
   return   temp;     //send back the temp
 } //read_temp
+
+//TO READ FROM THE TRIPLE SENSORS
+
+//NEEDS WORK
+//Parts for the read function
+//Arguments: Pin to read from
+//Returns: Values from that sensor.. somehow
+
+void read(pin)
+{
+	int  _1W_Pin, CRCRead, LowByte, HighByte, AVal, BVal, CVal, DVal;
+
+	_1W_Pin = pin; //select the pin to be used for OneWire as needed
+
+	Configure_2450(_1W_Pin); //use before gathering measurements
+	OneWireReset(_1W_Pin);
+	OneWireOutByte(_1W_Pin, 0xcc, 0);
+	OneWireOutByte(_1W_Pin, 0x3c, 0);  // convert
+	OneWireOutByte(_1W_Pin, 0x0f, 0);  // all channels
+	OneWireOutByte(_1W_Pin, 0x01, 0);  // preset to all zeros
+	CRCRead = FetchCRCBytes(_1W_Pin);
+	
+	while(1) // wait for conversion to complete
+    {
+       if(OneWireInByte(_1W_Pin) == 0xff)
+        {
+			break;
+        }
+    }
+
+	Alarm.delay(1); //use alarm library delays
+	
+    OneWireReset(_1W_Pin);
+    OneWireOutByte(_1W_Pin, 0xcc, 0);
+    OneWireOutByte(_1W_Pin, 0xaa, 0);  // read memory
+    OneWireOutByte(_1W_Pin, 0x00, 0);  // channel A
+    OneWireOutByte(_1W_Pin, 0x00, 0);  // locations 0000 and 0001
+	
+	//Channel A
+    LowByte = OneWireInByte(_1W_Pin);
+    HighByte = OneWireInByte(_1W_Pin);
+    AVal = HighByte*16 + LowByte/16;
+	
+	//Channel B
+    LowByte = OneWireInByte(_1W_Pin);
+    HighByte = OneWireInByte(_1W_Pin);
+    BVal = HighByte*16 + LowByte/16;
+
+	//Channel C
+    LowByte = OneWireInByte(_1W_Pin);
+    HighByte = OneWireInByte(_1W_Pin);
+    CVal = HighByte*16 + LowByte/16;
+
+	//Channel D
+	LowByte = OneWireInByte(_1W_Pin);
+    HighByte = OneWireInByte(_1W_Pin);
+    DVal = HighByte*16 + LowByte/16;
+	
+	//Reference
+  //Volts = CSng(ADVal) / 4096.0 * 5.12
+
+   }
+}
+
+
+//BELOW IS THE INTERFACE FOR THE ADC ON THE TRIPLE SENSOR(s)
+
+//Function Prototypes
+void Configure_2450(int _1W_Pin);
+int FetchCRCBytes(int _1W_Pin);
+void OneWireReset(int _1W_Pin);
+void OneWireOutByte(int _1W_Pin, byte d, byte strong);
+byte OneWireInByte(int _1W_Pin);
+
+void Configure_2450(int _1W_Pin)
+{
+   int CRCRead, Dummy;
+
+   OneWireReset(_1W_Pin);
+   OneWireOutByte(_1W_Pin, 0xcc, 0);
+   OneWireOutByte(_1W_Pin, 0x55, 0);
+   OneWireOutByte(_1W_Pin, 0x1c, 0);  // write to 001c
+   OneWireOutByte(_1W_Pin, 0x00, 0);
+   OneWireOutByte(_1W_Pin, 0x40, 0);  // Vcc operation
+
+   CRCRead = FetchCRCBytes(_1W_Pin);
+   Dummy = OneWireInByte(_1W_Pin); // readback the data
+
+   OneWireReset(_1W_Pin);
+   OneWireOutByte(_1W_Pin, 0xcc, 0);
+   OneWireOutByte(_1W_Pin, 0x55, 0);
+   OneWireOutByte(_1W_Pin, 0x08, 0);  // write beginning at  0008
+   OneWireOutByte(_1W_Pin, 0x00, 0);
+
+   OneWireOutByte(_1W_Pin, 0x0b, 0);  // channel A - 12 bits
+
+   CRCRead = FetchCRCBytes(_1W_Pin);
+   Dummy = OneWireInByte(_1W_Pin); // readback the data
+
+   OneWireOutByte(_1W_Pin, 0x01, 0);	// 5.12 VDC range
+   CRCRead = FetchCRCBytes(_1W_Pin);
+   Dummy = OneWireInByte(_1W_Pin);
+
+   OneWireOutByte(_1W_Pin, 0x0b, 0);	 //set up Channel B for 12 bit
+   CRCRead = FetchCRCBytes(_1W_Pin);
+   Dummy = OneWireInByte(_1W_Pin);
+
+   OneWireOutByte(_1W_Pin, 0x01, 0);	// 5.12 VDC range
+   CRCRead = FetchCRCBytes(_1W_Pin);
+   Dummy = OneWireInByte(_1W_Pin);
+
+   OneWireOutByte(_1W_Pin, 0x0b, 0);	 //set up Channel C for 12 bit
+   CRCRead = FetchCRCBytes(_1W_Pin);
+   Dummy = OneWireInByte(_1W_Pin);
+
+   OneWireOutByte(_1W_Pin, 0x01, 0);	// 5.12 VDC range
+   CRCRead = FetchCRCBytes(_1W_Pin);
+   Dummy = OneWireInByte(_1W_Pin);
+
+   OneWireOutByte(_1W_Pin, 0x0b, 0);	 //set up Channel D for 12 bit
+   CRCRead = FetchCRCBytes(_1W_Pin);
+   Dummy = OneWireInByte(_1W_Pin);
+
+   OneWireOutByte(_1W_Pin, 0x01, 0);	// 5.12 VDC range
+   CRCRead = FetchCRCBytes(_1W_Pin);
+   Dummy = OneWireInByte(_1W_Pin);
+}
+
+int FetchCRCBytes(int _1W_Pin)
+{
+   int x, y, CRC;
+
+   x = OneWireInByte(_1W_Pin);
+   y = OneWireInByte(_1W_Pin);
+   CRC = CRC * y + x;
+   return(CRC);
+}
+
+void OneWireReset(int _1W_Pin) // reset.  Should improve to act as a presence pulse
+{
+     digitalWrite(_1W_Pin, LOW);
+     pinMode(_1W_Pin, OUTPUT); // bring low for 500 us
+     delayMicroseconds(500);
+     pinMode(_1W_Pin, INPUT);
+     delayMicroseconds(500);
+}
+
+void OneWireOutByte(int _1W_Pin, byte d, byte strong) // output byte d (least sig bit first).
+{
+   byte n;
+
+   for(n=8; n!=0; n--)
+   {
+      if ((d & 0x01) == 1)  // test least sig bit
+      {
+         digitalWrite(_1W_Pin, LOW);
+         pinMode(_1W_Pin, OUTPUT);
+         delayMicroseconds(5);
+         pinMode(_1W_Pin, INPUT);
+         delayMicroseconds(60);
+      }
+      else
+      {
+         digitalWrite(_1W_Pin, LOW);
+         pinMode(_1W_Pin, OUTPUT);
+         delayMicroseconds(60);
+         pinMode(_1W_Pin, INPUT);
+      }
+
+      d=d>>1; // now the next bit is in the least sig bit position.
+   }
+   if(strong)
+   {
+       digitalWrite(_1W_Pin, HIGH); // One sec of strong +5 VDC
+       pinMode(_1W_Pin, OUTPUT);
+       delay(1000);
+       pinMode(_1W_Pin, INPUT);
+       digitalWrite(_1W_Pin, LOW);
+   }
+}
+
+byte OneWireInByte(int _1W_Pin) // read byte, least sig byte first
+{
+    byte d, n, b;
+
+    for (n=0; n<8; n++)
+    {
+        digitalWrite(_1W_Pin, LOW);
+        pinMode(_1W_Pin, OUTPUT);
+        delayMicroseconds(5);
+        pinMode(_1W_Pin, INPUT);
+        delayMicroseconds(5);
+        b = digitalRead(_1W_Pin);
+        delayMicroseconds(50);
+        d = (d >> 1) | (b<<7); // shift d to right and insert b in most sig bit position
+    }
+    return(d);
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
