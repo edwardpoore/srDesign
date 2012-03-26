@@ -21,6 +21,7 @@ SD card information:
 int index;
 const int triple1 = 7; //triple sensor number 1
 const int triple2 = 8; //triple sensor number 2
+int triple[4]; //an array to handle data from triple sensors
 
 void setup()
 {
@@ -101,13 +102,12 @@ void takeMeas(void)
   //Gather measurements from sensors
   float temperature = read_temp(); //collect temperature measurement
   
-  //Gather other measurements
-  /* 
+  //triple sensors
+  readTriple(triple1);
+  //process the information (subtractions)
+  readTriple(triple2);
+  //process
   
-    OTHER MEASUREMENT FUNCTION CALLS
-    LIKE, FOR EXAMPLE, THE ONE FOR THE TRIPLE SENSORS
-    THAT YOU NEED TO CLEAN UP
-  */
   
   //Build a string to represent the current time/date
   String timeAndDate = String(hour()) + ":" + String(minute()) + ":" + String(second()); //hh:mm:ss
@@ -284,8 +284,8 @@ float read_temp(void){                          //the read temperature function
 //Arguments: Pin to read from
 //Returns: Values from that sensor.. somehow
 
-void read(pin)
-{
+void readTriple(pin)
+{     
 	int  _1W_Pin, CRCRead, LowByte, HighByte, AVal, BVal, CVal, DVal;
 
 	_1W_Pin = pin; //select the pin to be used for OneWire as needed
@@ -333,11 +333,15 @@ void read(pin)
 	LowByte = OneWireInByte(_1W_Pin);
     HighByte = OneWireInByte(_1W_Pin);
     DVal = HighByte*16 + LowByte/16;
+  
+  //place the values into the global variable for triple sensor readings
+  triple[0] = AVal;
+  triple[1] = BVal;
+  triple[2] = CVal;
+  triple[3] = DVal;
 	
-	//Reference
+  //Reference
   //Volts = CSng(ADVal) / 4096.0 * 5.12
-
-   }
 }
 
 
@@ -474,29 +478,4 @@ byte OneWireInByte(int _1W_Pin) // read byte, least sig byte first
     }
     return(d);
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
