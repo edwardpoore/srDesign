@@ -12,12 +12,10 @@ SD card information:
 
 */
 #include <SD.h> //sd interface
-#include <Arduino.h> //needed for time
-#include <Time.h> //timekeeping
-#include <TimeAlarms.h>
 #include <Wire.h> //I2C communication
-#include <DS1307RTC.h> //basic DS1307 library
+#include <RTClib.h>
 
+RTC_DS1307 RTC; //RTC object
 int index;
 const int triple1 = 7; //triple sensor number 1
 const int triple2 = 8; //triple sensor number 2
@@ -45,13 +43,14 @@ void setup()
   }
 
   //Get the current date/time from the clock module
-  //Set the time library to automatically sync the time clock from the DS1307
   //DS1307 SDA is Ain4, SCL is Ain5
-  setSyncProvider(RTC.get);
-  if(timeStatus()!= timeSet) 
-    Serial.println("Unable to sync with the RTC");
-  else
-    Serial.println("RTC has set the system time");
+  Wire.begin();
+  RTC.begin();
+  if (! RTC.isrunning()) {
+    Serial.println("RTC is NOT running!");
+  }
+  DateTime now = RTC.now();
+  DateTime time (now.unixtime()-2*86400+3*3600);
 
   //Generate initial file if none found
   if(!SD.exists("mydata.csv"))
@@ -61,12 +60,13 @@ void setup()
 
   index = 1; //index to represent how many measurements have been made since last time power was lost. Set to 1 at startup
 
-
   Serial.println("Setup Complete.");
 }
 
 void loop()
 {
+  DateTime now = RTC.now();
+  DateTime time (now.unixtime()-2*86400+3*3600);
   byte inByte; //call/reponse variable
   //Call/Response for serial  
 
@@ -89,13 +89,15 @@ void loop()
       } //switch(inByte)
     } //if serial.available  
   
-  if(second()%30 == 0) //take measurements every 30 seconds
+  if(time.second()%30 == 0) //take measurements every 30 seconds
   {
     takeMeas();
-    Alarm.delay(1100); //wait one second so it will only trigger once
+    delay(1100); //wait one second so it will only trigger once
   }
 
 } //loop
+  
+  
   
 void takeMeas(void)
 {
@@ -107,11 +109,13 @@ void takeMeas(void)
   //process the information (subtractions)
   readTriple(triple2);
   //process
-  
+
+  DateTime now = RTC.now();
+  DateTime time (now.unixtime()-2*86400+3*3600);
   
   //Build a string to represent the current time/date
-  String timeAndDate = String(hour()) + ":" + String(minute()) + ":" + String(second()); //hh:mm:ss
-  timeAndDate = timeAndDate + "|" + String(2) + "/" + String(25) + "/" + String(12); //hh:mm:ss|mm/dd/yyyy
+  String timeAndDate = String(time.hour()) + ":" + String(time.minute()) + ":" + String(time.second()); //hh:mm:ss
+  timeAndDate = timeAndDate + "|" + String(time.month()) + "/" + String(time.day()) + "/" + String(time.year()); //hh:mm:ss|mm/dd/yyyy
   
   //add an entry to the file
   addEntry( index, temperature, 1.0, 1.0, 1.0, 1.0, 1.0, timeAndDate);
@@ -284,7 +288,7 @@ float read_temp(void){                          //the read temperature function
 //Arguments: Pin to read from
 //Returns: Values from that sensor.. somehow
 
-void readTriple(pin)
+void readTriple(int pin)
 {     
 	int  _1W_Pin, CRCRead, LowByte, HighByte, AVal, BVal, CVal, DVal;
 
@@ -306,7 +310,7 @@ void readTriple(pin)
         }
     }
 
-	Alarm.delay(1); //use alarm library delays
+	delay(1); //use alarm library delays
 	
     OneWireReset(_1W_Pin);
     OneWireOutByte(_1W_Pin, 0xcc, 0);
