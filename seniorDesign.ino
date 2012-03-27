@@ -10,6 +10,17 @@ SD card information:
  ** MISO - pin 12
  ** CLK - pin 13
 
+ SDA -> A4
+ SCL -> A5
+ 
+ DI0, DI1 -> UART
+ DI3 -> Flow Control for UART
+ 
+ DI6 -> triple sensor 1
+ DI7 -> triple sensor 2
+ 
+ 
+ 
 */
 #include <SD.h> //sd interface
 #include <Wire.h> //I2C communication
@@ -17,8 +28,8 @@ SD card information:
 
 RTC_DS1307 RTC; //RTC object
 int index;
-const int triple1 = 7; //triple sensor number 1
-const int triple2 = 8; //triple sensor number 2
+const int triple1 = 6; //triple sensor number 1
+const int triple2 = 7; //triple sensor number 2
 int triple[4]; //an array to handle data from triple sensors
 
 void setup()
