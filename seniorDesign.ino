@@ -30,13 +30,13 @@ RTC_DS1307 RTC; //RTC object
 int index;
 const int triple1 = 6; //triple sensor number 1
 const int triple2 = 7; //triple sensor number 2
-int triple[4]; //an array to handle data from triple sensors
+float triple[2]; //an array to handle data from triple sensors
 
 void setup()
 {
   Serial.begin(9600); //start serial comm
   pinMode(10, OUTPUT); //pin 10 needs to be set as an output for the SD library
-  pinMode(2, OUTPUT); //used to drive the temperature sensor
+  pinMode(2, INPUT); //CTS for the xbee if needed
   
   //SETUP FOR TRIPLE SENSOR ONE WIRE DATA LINES
   //Sensor 1
@@ -95,7 +95,6 @@ void loop()
             Serial.println("Press d to retrieve data from node. Press e to erase data");
           break;
         default:
-          Serial.println("Invalid Command. Press h for help.");
           break; //do nothing
       } //switch(inByte)
     } //if serial.available  
@@ -117,9 +116,12 @@ void takeMeas(void)
   
   //triple sensors
   readTriple(triple1);
-  //process the information (subtractions)
+  float triple1Turb = triple[0];
+  float triple1Flow = triple[1];
+
   readTriple(triple2);
-  //process
+  float triple2Turb = triple[0];
+  float triple2Flow = triple[1];
 
   DateTime now = RTC.now();
   DateTime time (now.unixtime()-2*86400+3*3600);
@@ -129,7 +131,7 @@ void takeMeas(void)
   timeAndDate = timeAndDate + "|" + String(time.month()) + "/" + String(time.day()) + "/" + String(time.year()); //hh:mm:ss|mm/dd/yyyy
   
   //add an entry to the file
-  addEntry( index, temperature, 1.0, 1.0, 1.0, 1.0, 1.0, timeAndDate);
+  addEntry( index, temperature, triple1Turb, triple1Flow, triple2Turb, triple2Flow, timeAndDate);
   Serial.println("Measurements taken and added to file.");
   return;
 }//takeMeasurements
@@ -157,11 +159,10 @@ void eraseFile()
           eraseStuff = 1; //kick out of loop and continue  
           break;
         case 'n': //if inByte = n
-            return; //dont erase stuff
+          return; //dont erase stuff
           break;
         default: //else
-          Serial.println("Invalid Command. y for yes or n for no.");
-          //do nothing
+          break;
       } //switch(inByte)
     } //if serial.available  
   }//while(1)
@@ -232,7 +233,7 @@ Add an entry to the end of the file.
 Construct the entry from the parameters passed
 */
 
-void addEntry( int entry, float temp, float disso, float turb, float flow, float pH, float ec, String timeDate)
+void addEntry( int entry, float temp, float turb1, float flow1, float turb2, float flow2, String timeDate)
 {
   
   //open file
@@ -244,19 +245,17 @@ void addEntry( int entry, float temp, float disso, float turb, float flow, float
     {
       //add the string to the file
       //myFile.println(entryString);
-      myFile.print(index);
+      myFile.print(entry);
       myFile.print(", ");
       myFile.print(temp);
       myFile.print(", ");
-      myFile.print(disso);
+      myFile.print(turb1);
       myFile.print(", ");
-      myFile.print(turb);
-      myFile.print(", ");
-      myFile.print(flow);
+      myFile.print(flow1);
       myFile.print(", ");   
-      myFile.print(pH);
+      myFile.print(turb2);
       myFile.print(", ");
-      myFile.print(ec);
+      myFile.print(flow2);
       myFile.print(", ");
       myFile.println(timeDate);
       
@@ -271,19 +270,20 @@ void addEntry( int entry, float temp, float disso, float turb, float flow, float
 //Wiring
 //white - A0
 //black - gnd
-//red - pin 2 - consider moving to VDD on final design
+//red - vdd
 float read_temp(void){                          //the read temperature function 
   float v_out;                                  //voltage output from temp sensor  
   float temp;         //the final temperature is stored here (this is only for code clarity) 
 
   digitalWrite(A0, LOW);                       //set pull-up on analog pin 0
 
-  digitalWrite(2, HIGH);                       //set pin 2 high, this will turn on temp sensor
+// writing and resetting d2 not needed when red is connected to vdd
+//  digitalWrite(2, HIGH);                       //set pin 2 high, this will turn on temp sensor
 
   delay(2);                               //wait 1 ms for temp to stabilize
 
   v_out = analogRead(0);                  //read the input pin
-  digitalWrite(2, LOW);                  //set pin 2 low, this will turn off temp sensor 
+//  digitalWrite(2, LOW);                  //set pin 2 low, this will turn off temp sensor 
 
   v_out*=.0048;    //convert ADC points to volts (we are using .0048 because this device is running at 5 volts)
   v_out*=1000;                                      //convert volts to millivolts  
@@ -294,10 +294,6 @@ float read_temp(void){                          //the read temperature function
 
 //TO READ FROM THE TRIPLE SENSORS
 
-//NEEDS WORK
-//Parts for the read function
-//Arguments: Pin to read from
-//Returns: Values from that sensor.. somehow
 
 void readTriple(int pin)
 {     
@@ -321,7 +317,7 @@ void readTriple(int pin)
         }
     }
 
-	delay(1); //use alarm library delays
+	delay(1);
 	
     OneWireReset(_1W_Pin);
     OneWireOutByte(_1W_Pin, 0xcc, 0);
@@ -350,11 +346,19 @@ void readTriple(int pin)
     DVal = HighByte*16 + LowByte/16;
   
   //place the values into the global variable for triple sensor readings
-  triple[0] = AVal;
-  triple[1] = BVal;
-  triple[2] = CVal;
-  triple[3] = DVal;
-	
+  //flow -> triple[1]
+  //turbidity -> triple[0]
+
+  int turb = (AVal - BVal); //get a differential measurement
+  int flow = (CVal - DVal);
+  flow = abs(flow); //we only care about the absolute difference
+  turb = abs(turb);
+
+  //return the values
+  triple[0] = (float)turb / 4096.0 * 5.12;
+  triple[1] = (float)flow / 4096.0 * 5.12;
+
+
   //Reference
   //Volts = CSng(ADVal) / 4096.0 * 5.12
 }
