@@ -106,8 +106,7 @@ void loop()
     //for testing - example output
     //String timeAndDate = String(time.hour()) + ":" + String(time.minute()) + ":" + String(time.second()); //hh:mm:ss
     //timeAndDate = timeAndDate + "|" + String(time.month()) + "/" + String(time.day()) + "/" + String(time.year()); //hh:mm:ss|mm/dd/yyyy
-    
-    Serial.println(timeAndDate);
+    //Serial.println(timeAndDate);
     delay(1100); //wait one second so it will only trigger once
   }
 
