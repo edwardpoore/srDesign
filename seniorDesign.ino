@@ -14,8 +14,8 @@ SD card information:
  SCL -> A5
  
  DI0, DI1 -> UART
- DI3 -> Flow Control for UART
- 
+ DI2 -> Flow Control for UART
+ DI3 -> temperature sensor power
  DI6 -> triple sensor 1
  DI7 -> triple sensor 2
  
@@ -36,7 +36,7 @@ void setup()
 {
   Serial.begin(9600); //start serial comm
   pinMode(10, OUTPUT); //pin 10 needs to be set as an output for the SD library
-  pinMode(2, INPUT); //CTS for the xbee if needed
+  pinMode(3, OUTPUT); 
   
   //SETUP FOR TRIPLE SENSOR ONE WIRE DATA LINES
   //Sensor 1
@@ -61,7 +61,7 @@ void setup()
     Serial.println("RTC is NOT running!");
   }
   DateTime now = RTC.now();
-  DateTime time (now.unixtime()-2*86400+3*3600);
+  DateTime time (now.unixtime());//-2*86400+3*3600);
 
   //Generate initial file if none found
   if(!SD.exists("mydata.csv"))
@@ -77,7 +77,7 @@ void setup()
 void loop()
 {
   DateTime now = RTC.now();
-  DateTime time (now.unixtime()-2*86400+3*3600);
+  DateTime time (now.unixtime()); //-2*86400+3*3600);
   byte inByte; //call/reponse variable
   //Call/Response for serial  
 
@@ -99,7 +99,7 @@ void loop()
       } //switch(inByte)
     } //if serial.available  
   
-  if(time.second()%30 == 0) //take measurements every 30 seconds
+  if(time.second()%10 == 0) //take measurements every 30 seconds
   {
     takeMeas();
     
@@ -118,6 +118,7 @@ void takeMeas(void)
 {
   //Gather measurements from sensors
   float temperature = read_temp(); //collect temperature measurement
+  //temperature = temperature-200;
   
   //triple sensors
   readTriple(triple1);
@@ -129,7 +130,7 @@ void takeMeas(void)
   float triple2Flow = triple[1];
 
   DateTime now = RTC.now();
-  DateTime time (now.unixtime()-2*86400+3*3600);
+  DateTime time (now.unixtime());//-2*86400+3*3600);
   
   //Build a string to represent the current time/date
   String timeAndDate = String(time.hour()) + ":" + String(time.minute()) + ":" + String(time.second()); //hh:mm:ss
@@ -238,7 +239,7 @@ Add an entry to the end of the file.
 Construct the entry from the parameters passed
 */
 
-void addEntry( int entry, float temp, float turb1, float flow1, float turb2, float flow2, String timeDate)
+void addEntry( int entry, long temp, float turb1, float flow1, float turb2, float flow2, String timeDate)
 {
   
   //open file
@@ -283,12 +284,12 @@ float read_temp(void){                          //the read temperature function
   digitalWrite(A0, LOW);                       //set pull-up on analog pin 0
 
 // writing and resetting d2 not needed when red is connected to vdd
-//  digitalWrite(2, HIGH);                       //set pin 2 high, this will turn on temp sensor
+  digitalWrite(3, HIGH);                       //set pin 2 high, this will turn on temp sensor
 
   delay(2);                               //wait 1 ms for temp to stabilize
 
   v_out = analogRead(0);                  //read the input pin
-//  digitalWrite(2, LOW);                  //set pin 2 low, this will turn off temp sensor 
+  digitalWrite(3, LOW);                  //set pin 2 low, this will turn off temp sensor 
 
   v_out*=.0048;    //convert ADC points to volts (we are using .0048 because this device is running at 5 volts)
   v_out*=1000;                                      //convert volts to millivolts  
